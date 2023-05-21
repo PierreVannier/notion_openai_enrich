@@ -17,3 +17,8 @@ X_RAPID_API_KEY = os.getenv('X_RAPID_API_KEY', None)
 NOTION_DB_ID = os.getenv("NOTION_DB_ID", None)
 OPENAI_PREPROMPT = os.getenv("OPENAI_PREPROMPT", None)
 ```
+
+Best is to create a virtual env (conda or venv), then :
+```
+pip install -r requirements.txt
+```
