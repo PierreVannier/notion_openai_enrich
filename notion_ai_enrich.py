@@ -222,13 +222,13 @@ def print_clients(slice_clients):
     for client in clients[0:slice_clients]:
         print("Within client "+client['name'])
 
-if False:
-    if __name__ == '__main__':
-        get_notion_clients()
-        slice_clients = len(clients)
-        for client in clients[0:slice_clients]:
-            get_linkedin_bio(client)
-            get_linkedin_activities(client)
-            analyze_clients_with_ai(client)
-            save_analysis_to_notion(client)
+
+if __name__ == '__main__':
+    get_notion_clients()
+    slice_clients = len(clients)
+    for client in clients[0:slice_clients]:
+        get_linkedin_bio(client)
+        get_linkedin_activities(client)
+        analyze_clients_with_ai(client)
+        save_analysis_to_notion(client)
         
