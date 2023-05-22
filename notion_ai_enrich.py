@@ -6,6 +6,7 @@ import openai
 import time
 import os
 import re
+from dotenv import load_dotenv
 
 # This allows to retry when OpenAI isn't working
 from tenacity import (
@@ -14,43 +15,28 @@ from tenacity import (
     wait_random_exponential,
 )  # for exponential backoff
 
+load_dotenv()
+
 # necessary secrets
 OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
 NOTION_API_KEY = os.environ['NOTION_API_KEY'] 
 X_RAPID_API_KEY = os.environ['X_RAPID_API_KEY'] 
+RAPID_API_URL = os.environ['RAPID_API_URL'] 
 NOTION_DB_ID = os.environ['NOTION_DB_ID']
-pre_prompt = """
-Tu es un commercial expérimenté dans la Tech / IT et tu collectes des informations stratégiques de prospects en te basant sur des informations issues du réseau linkedin.
-Voici un texte au format JSON qui représente un prospect utilisateur linkedin et ses activités sur le réseau social professionnel linkedin : 
-'bio' : la description de l'utilisateur
-'posts rédigés par l\'utilisateur\' : la liste de posts rédigés par l\'utilisateur
-'posts commentés par l\'utilisateur\' : la liste de posts commentés par l\'utilisateur (attention, ce ne sont pas des posts écrit par l\'utilisateur)
-'post ayant fait réagir l\'utilisateur\' : la liste de posts sur lesquel l\'utilisateur a réagi (réagi veut dire \'liké\' mais ne veut pas dire rédigé par l\'utilisateur)
-La bio de l\'utilisateur peut contenir des informations importantes, je veux que tu notes les points notables de la bio si la bio n\'est pas vide.
-En fonction des éléments de ce texte au format JSON, tu me listeras quelques thèmes qui intéressent l\'utilisateur dans la sphère professionnelle classés par ordre d\'importance pour l\'utilisateur.
-Tu indiqueras un thème par ligne comme une liste de bullet points.
-Puis tu résumeras en 3 lignes le post rédigé par l\'utilisateur qui est le plus pertinent et aussi le plus récent.
-Tu m\'indiqueras la fraicheur de ce post à la suite du résumé du post dans ton output.
-Tu m\'indiqueras sur une nouvelle ligne les quelques mots clefs importants relatifs à la technologie que tu as détectés pour cet utilisateur.
-Tu indiqueras un mot clef par ligne comme une liste de bullet points.
-Enfin, dis-moi si tu penses que l\'utilisateur est actif sur le réseau linkedin.
-Si il ne l\'est pas alors tu indiqueras \"UTILISATEUR NON ACTIF SUR LINKEDIN\".
-Voici le texte au format JSON :
-"""
-os.environ['OPENAI_PREPROMPT'] = pre_prompt
 OPENAI_PREPROMPT = os.environ['OPENAI_PREPROMPT']
+URL_RAPID_API_ACTIVITY_POST = os.environ['URL_RAPID_API_ACTIVITY_POST']
+URL_RAPID_API_ACTIVITY_PROFILE = os.environ['URL_RAPID_API_ACTIVITY_PROFILE']
 
 openai.api_key = OPENAI_API_KEY 
 notion = Client(auth=NOTION_API_KEY)
 HEADERS_RAPID_API = {
-            "X-RapidAPI-Host": "fresh-linkedin-profile-data.p.rapidapi.com",
+            "X-RapidAPI-Host": RAPID_API_URL,
             "X-RapidAPI-Key": X_RAPID_API_KEY
             }
-URL_RAPID_API_ACTIVITY_POST = "https://fresh-linkedin-profile-data.p.rapidapi.com/get-profile-posts"
-URL_RAPID_API_ACTIVITY_PROFILE = "https://fresh-linkedin-profile-data.p.rapidapi.com/get-linkedin-profile"
-
 clients = []
 
+
+# Get last weeks new client in Notion
 def get_notion_clients():
     page = notion.databases.query(
     **{
@@ -102,6 +88,7 @@ def save_analysis_to_notion(client):
         )
         print("Updating Notion property")
 
+# Cause OpenAI is kind of a famous API, we might need to retry that call
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
 def generate_summarizer(
     max_tokens=100,
@@ -127,7 +114,8 @@ def generate_summarizer(
         ],
     )
     return res["choices"][0]["message"]["content"]
-    
+
+
 def get_linkedin_info_for(url, headers, client_url, types = ["posts", "comments", "reactions"]):
     responses = {}
     for t in types:
@@ -172,6 +160,7 @@ def filter_linkedin_activities(linkedin_activities):
     for key in mapping_human_name:
         
         for item in linkedin_activities[key]:
+            # API entities returned have typos...
             item.setdefault("acticle_title", "")
             item.setdefault("acticle_subtitle", "")
             item.setdefault("text", "")
@@ -192,11 +181,12 @@ def filter_linkedin_activities(linkedin_activities):
                     linkedin_activity[mapping_human_name[key]].append(
                             activity
                         )
-    # print(linkedin_activity)
+    
     return(linkedin_activity)
         
 
 def get_linkedin_activities(client):
+    # Let's keep it cool for the API, under threshold
     time.sleep(1)
     linkedin_activities = get_linkedin_info_for(URL_RAPID_API_ACTIVITY_POST, HEADERS_RAPID_API, client['linkedin_url'])
     print("studying linkedin prospect "+client['page_id'])
@@ -232,12 +222,13 @@ def print_clients(slice_clients):
     for client in clients[0:slice_clients]:
         print("Within client "+client['name'])
 
-if __name__ == '__main__':
-    get_notion_clients()
-    slice_clients = len(clients)
-    for client in clients[0:slice_clients]:
-        get_linkedin_bio(client)
-        get_linkedin_activities(client)
-        analyze_clients_with_ai(client)
-        save_analysis_to_notion(client)
-    
+if False:
+    if __name__ == '__main__':
+        get_notion_clients()
+        slice_clients = len(clients)
+        for client in clients[0:slice_clients]:
+            get_linkedin_bio(client)
+            get_linkedin_activities(client)
+            analyze_clients_with_ai(client)
+            save_analysis_to_notion(client)
+        
