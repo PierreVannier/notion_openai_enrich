@@ -15,11 +15,32 @@ from tenacity import (
 )  # for exponential backoff
 
 # necessary secrets
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', None)
-NOTION_API_KEY = os.getenv('NOTION_API_KEY', None)
-X_RAPID_API_KEY = os.getenv('X_RAPID_API_KEY', None)
-NOTION_DB_ID = os.getenv("NOTION_DB_ID", None)
-OPENAI_PREPROMPT = os.getenv("OPENAI_PREPROMPT", None)
+OPENAI_API_KEY = os.environ['OPENAI_API_KEY']
+NOTION_API_KEY = os.environ['NOTION_API_KEY'] 
+X_RAPID_API_KEY = os.environ['X_RAPID_API_KEY'] 
+NOTION_DB_ID = os.environ['NOTION_DB_ID']
+pre_prompt = """
+Tu es un commercial expérimenté dans la Tech / IT et tu collectes des informations stratégiques de prospects en te basant sur des informations issues du réseau linkedin.
+Voici un texte au format JSON qui représente un prospect utilisateur linkedin et ses activités sur le réseau social professionnel linkedin : 
+'bio' : la description de l'utilisateur
+'posts rédigés par l\'utilisateur\' : la liste de posts rédigés par l\'utilisateur
+'posts commentés par l\'utilisateur\' : la liste de posts commentés par l\'utilisateur (attention, ce ne sont pas des posts écrit par l\'utilisateur)
+'post ayant fait réagir l\'utilisateur\' : la liste de posts sur lesquel l\'utilisateur a réagi (réagi veut dire \'liké\' mais ne veut pas dire rédigé par l\'utilisateur)
+La bio de l\'utilisateur peut contenir des informations importantes, je veux que tu notes les points notables de la bio si la bio n\'est pas vide.
+En fonction des éléments de ce texte au format JSON, tu me listeras quelques thèmes qui intéressent l\'utilisateur dans la sphère professionnelle classés par ordre d\'importance pour l\'utilisateur.
+Tu indiqueras un thème par ligne comme une liste de bullet points.
+Puis tu résumeras en 3 lignes le post rédigé par l\'utilisateur qui est le plus pertinent et aussi le plus récent.
+Tu m\'indiqueras la fraicheur de ce post à la suite du résumé du post dans ton output.
+Tu m\'indiqueras sur une nouvelle ligne les quelques mots clefs importants relatifs à la technologie que tu as détectés pour cet utilisateur.
+Tu indiqueras un mot clef par ligne comme une liste de bullet points.
+Enfin, dis-moi si tu penses que l\'utilisateur est actif sur le réseau linkedin.
+Si il ne l\'est pas alors tu indiqueras \"UTILISATEUR NON ACTIF SUR LINKEDIN\".
+Voici le texte au format JSON :
+"""
+os.environ['OPENAI_PREPROMPT'] = pre_prompt
+OPENAI_PREPROMPT = os.environ['OPENAI_PREPROMPT']
+
+print(OPENAI_API_KEY + " "+ NOTION_API_KEY + " "+X_RAPID_API_KEY + " "+NOTION_DB_ID+" "+OPENAI_PREPROMPT)
 
 openai.api_key = OPENAI_API_KEY 
 notion = Client(auth=NOTION_API_KEY)
@@ -92,6 +113,7 @@ def generate_summarizer(
     prompt = "Nothing"
 ):
     activites_json = json.dumps(prompt, indent=2, ensure_ascii=False)
+    print(activites_json)
     res = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         temperature=0.5,
@@ -141,12 +163,12 @@ def get_human_freshness_from_interaction(t):
 
 def filter_linkedin_activities(linkedin_activities):
     mapping_human_name = {"posts": "posts rédigés par l'utilisateur",
-                          "comments": "posts commentés par l'utilisateur",
-                          "reactions": "post ayant fait réagir l'utilisateur"
+                          "comments": "posts commentés (mais non rédigé) par l'utilisateur",
+                          "reactions": "post ayant fait réagir l'utilisateur (mais non rédigés par l'utilisateur)"
                           }
     linkedin_activity = {"posts rédigés par l'utilisateur" : [],
-                         "posts commentés par l'utilisateur" : [],
-                         "post ayant fait réagir l'utilisateur" : []
+                         "posts commentés (mais non rédigé) par l'utilisateur" : [],
+                         "post ayant fait réagir l'utilisateur (mais non rédigés par l'utilisateur)" : []
                          }
     token_length = 0
     for key in mapping_human_name:
@@ -172,7 +194,7 @@ def filter_linkedin_activities(linkedin_activities):
                     linkedin_activity[mapping_human_name[key]].append(
                             activity
                         )
-            
+    # print(linkedin_activity)
     return(linkedin_activity)
         
 
@@ -215,10 +237,11 @@ def print_clients(slice_clients):
 
 if __name__ == '__main__':
     get_notion_clients()
-    slice_clients = len(clients) - 1
+    slice_clients = len(clients)
     print(len(clients))
     for client in clients[0:slice_clients]:
         get_linkedin_bio(client)
         get_linkedin_activities(client)
         analyze_clients_with_ai(client)
         save_analysis_to_notion(client)
+    
