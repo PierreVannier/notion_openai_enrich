@@ -40,8 +40,6 @@ Voici le texte au format JSON :
 os.environ['OPENAI_PREPROMPT'] = pre_prompt
 OPENAI_PREPROMPT = os.environ['OPENAI_PREPROMPT']
 
-print(OPENAI_API_KEY + " "+ NOTION_API_KEY + " "+X_RAPID_API_KEY + " "+NOTION_DB_ID+" "+OPENAI_PREPROMPT)
-
 openai.api_key = OPENAI_API_KEY 
 notion = Client(auth=NOTION_API_KEY)
 HEADERS_RAPID_API = {
@@ -223,7 +221,6 @@ def analyze_clients_with_ai(client):
     client["ai_analysis"] = None
     if result.find("UTILISATEUR NON ACTIF SUR LINKEDIN") == -1:
         print("Client's worth analyzing")
-        pp(result)
         client["ai_analysis"] = result
         client['linkedin_activity'] = ('Active', 'green')
         
@@ -238,7 +235,6 @@ def print_clients(slice_clients):
 if __name__ == '__main__':
     get_notion_clients()
     slice_clients = len(clients)
-    print(len(clients))
     for client in clients[0:slice_clients]:
         get_linkedin_bio(client)
         get_linkedin_activities(client)
